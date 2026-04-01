@@ -1,12 +1,12 @@
 ---
 name: usage-stats
-description: Show the user's Claude Code usage stats for the current day - prompts sent, sessions, projects, and historical comparison from ~/.claude/
+description: Show the user's Claude Code usage stats for the current day - prompts sent, sessions, projects, token usage, and estimated API cost from ~/.claude/
 user_invocable: true
 ---
 
 # Usage Stats
 
-Show the user their Claude Code usage stats for today.
+Show the user their Claude Code usage stats for today with token breakdown and cost estimates.
 
 **Announce at start:** "Checking your usage stats for today..."
 
@@ -14,60 +14,85 @@ Show the user their Claude Code usage stats for today.
 
 1. **`~/.claude/history.jsonl`** — one JSON object per line, each user prompt with `timestamp`, `project`, `sessionId`
 2. **`~/.claude/stats-cache.json`** — historical aggregate stats with `dailyActivity`, `dailyModelTokens`, `modelUsage`, `totalSessions`, `totalMessages`
-3. **`~/.claude/sessions/`** — JSON files named `{pid}.json` with `sessionId`, `startedAt`, `kind`
+3. **`~/.claude/projects/*/<sessionId>.jsonl`** — conversation logs containing assistant messages with `message.usage` (input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens) and `message.model`
 
 ## Steps
 
-### 1. Gather Today's Data
+### 1. Run a single Python script
 
-Run a Python script to parse `~/.claude/history.jsonl` and compute:
+Run a single Python script that does ALL of the following in one pass:
 
+**From history.jsonl** — filter to today's local date (midnight to now, timestamps are ms since epoch):
 - Total prompts sent today
-- Number of unique sessions today
-- Prompts broken down by project (use basename of project path)
-- Prompts broken down by session
-- Time of first and last prompt
-- Active hours span
+- Unique session IDs
+- Prompts per project (use basename, show home dir as "~ (home)")
+- Timestamp of first and last prompt
 
-Use the current local date (midnight to now) as the filter window. Convert timestamps from milliseconds.
+**From project .jsonl files** — for each of today's session IDs, walk `~/.claude/projects/` to find matching `<sessionId>.jsonl` files. Parse assistant messages where `message.usage` exists:
+- Aggregate tokens per model: input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens
+- Count total API requests
 
-### 2. Gather Historical Context
+**From stats-cache.json**:
+- totalMessages, totalSessions
+- dailyActivity for average/busiest day comparison
 
-Read `~/.claude/stats-cache.json` to get:
+### 2. Compute estimated API cost
 
-- `totalMessages` and `totalSessions` (all-time)
-- `dailyActivity` array for comparison (average messages/day, busiest day)
-- `longestSession` info
+Use these rates (per million tokens) for cost estimation:
 
-### 3. Present Results
+| Model | Input | Output | Cache Write | Cache Read |
+|-------|-------|--------|-------------|------------|
+| claude-opus-4-6 | $15 | $75 | $18.75 | $1.50 |
+| claude-sonnet-4-6 | $3 | $15 | $3.75 | $0.30 |
+| claude-sonnet-4-5-20250929 | $3 | $15 | $3.75 | $0.30 |
+| claude-haiku-4-5-20251001 | $0.80 | $4 | $1 | $0.08 |
 
-Format the output as a clean summary:
+For any model containing "opus" use opus rates, "sonnet" use sonnet rates, "haiku" use haiku rates.
+
+### 3. Present results with style
+
+Use box-drawing characters and visual flair. Format like this:
 
 ```
-## Today's Usage (Apr 1, 2026)
+╔══════════════════════════════════════════════════════════╗
+║              CLAUDE CODE DAILY REPORT                    ║
+║              <date> — <first_time> to <last_time>       ║
+╚══════════════════════════════════════════════════════════╝
 
-| Metric            | Value |
-|-------------------|-------|
-| Prompts sent      | 57    |
-| Sessions          | 6     |
-| Active since      | 12:17 PM |
-| Last prompt       | 3:47 PM  |
+┌─ ACTIVITY ──────────────────────────────────────────────┐
+│  <N> prompts  ·  <N> sessions  ·  <N> API requests      │
+│                                                          │
+│  <project_a>  ████████████████░░░░░░░░░░  <N> (<pct>%)  │
+│  <project_b>  ███████████████░░░░░░░░░░░  <N> (<pct>%)  │
+└──────────────────────────────────────────────────────────┘
 
-### By Project
-- adaptivereader: 30 prompts
-- ~ (home): 27 prompts
+┌─ TOKENS & COST ────────────────────────────────────────-┐
+│  Model: <model_name>                                     │
+│  Tier:  <TIER> pricing                                   │
+│                                                          │
+│  Input          <tokens>    ░░░░░░░░░░░░░░  $<cost>     │
+│  Output         <tokens>    ████████░░░░░░  $<cost>     │
+│  Cache Write    <tokens>    ██████████████  $<cost>     │
+│  Cache Read     <tokens>    ██████████████  $<cost>     │
+│                                                          │
+│                                  TOTAL      $<total>    │
+└──────────────────────────────────────────────────────────┘
 
-### Historical Context
-- All-time: X messages across Y sessions
-- Daily average: Z messages/day
-- Today vs average: above/below average
+┌─ HISTORICAL CONTEXT ────────────────────────────────────┐
+│  All-time: <N> messages across <N> sessions              │
+│  Daily avg: <N> msgs/day                                 │
+│  Today vs avg: ▼/▲ below/above average                   │
+│  Busiest day: <date> (<N> msgs)                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Keep it concise. Use a table for the main metrics, bullets for breakdowns.
+Use filled blocks (█) and empty blocks (░) for bar charts. Scale bars proportionally. Right-align dollar amounts. Use commas in large numbers.
 
 ## Important
 
 - Timestamps in history.jsonl are in milliseconds since epoch
 - Use the local timezone for display
-- If stats-cache.json is stale (lastComputedDate is old), note that historical stats may be incomplete
+- If stats-cache.json is stale (lastComputedDate is old), note it
 - If no prompts found for today, say so clearly
+- The bar chart for projects should be proportional to their prompt counts
+- The bar chart for token categories should be proportional to their dollar cost
