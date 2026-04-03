@@ -60,6 +60,11 @@ Things that could go either way, locked down here:
 What this does NOT include (prevents scope creep during implementation):
 - [thing that might seem related but isn't part of this]
 
+## Grill Me
+Hard questions asked about this spec and the answers:
+- Q: [tough question about the plan]
+  A: [the answer, or "left to implementer's judgment"]
+
 ## Implementation Steps
 Ordered list of discrete units of work, each small enough to verify:
 1. [step] — verify by [how]
@@ -76,7 +81,26 @@ After drafting, review it yourself through the lens of "what would Claude Code g
 
 Present these as questions to the user: "I notice we haven't specified X — do you want to lock that down or leave it to Claude Code's judgment?"
 
-### Step 4: Output
+### Step 4: Grill Me
+
+This is the most important step. After the spec is drafted and initial gaps are flagged, **absolutely grill the user** about their plan. Don't be polite about it — be the skeptical senior engineer in a design review. Your job is to stress-test the spec before a single line of code gets written.
+
+Hit them with questions like:
+- **"Why this approach and not X?"** — Force them to justify architectural choices. If they can't, the spec isn't ready.
+- **"What happens when this fails at 3am?"** — Push on operational reality. Who gets paged? What's the fallback? Is there a degraded mode?
+- **"You said [X] is out of scope — are you sure? What happens when a user expects it?"** — Challenge scope boundaries. Sometimes "out of scope" is wishful thinking.
+- **"How do you know this is done?"** — If the acceptance criteria are vague, call it out. "It works" is not a criterion.
+- **"What's the worst thing that happens if we ship this with a bug?"** — Understand blast radius. This changes how carefully we need to spec.
+- **"Have you actually looked at the code you're referencing?"** — If they reference existing patterns, make sure those patterns actually do what they think.
+- **"What are you most uncertain about?"** — Go straight for the weak spots. The parts they're least sure about are the parts that need the most spec.
+- **"If you had to cut this in half, what survives?"** — Forces prioritization. If everything is "must have," nothing is.
+- **"Who else cares about this?"** — Stakeholders, downstream consumers, other teams. Specs that ignore their audience create rework.
+
+Don't ask all of these — pick the 3-5 that hit hardest for this specific spec. Be direct. The goal is to surface the hidden assumptions and hand-wavy parts *now*, not after implementation.
+
+Record the user's answers in the spec under a **Grill Me** section — these become some of the most valuable context for the implementing agent.
+
+### Step 5: Output
 
 Save the final spec as a markdown file the user can drop into their repo (e.g., `specs/feature-name.md` or `PLAN.md`).
 
